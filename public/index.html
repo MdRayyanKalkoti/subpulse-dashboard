@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YT Subscriber Dashboard</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<!-- Connection indicator -->
+<div class="connection-bar" id="connectionBar"></div>
+
+<!-- Screen flash on new sub -->
+<div class="flash-overlay" id="flashOverlay"></div>
+
+<!-- Confetti canvas -->
+<canvas id="confetti-canvas"></canvas>
+
+<!-- ─── Main Dashboard ──────────────────────────────────────────────────── -->
+<div class="dashboard">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        LIVE
+      </div>
+      <h1 class="header-title">SUB<span>GOAL</span> DASHBOARD</h1>
+    </div>
+    <div class="header-status">
+      <div class="status-item">
+        <div class="status-dot" id="socketStatus"></div>
+        <span id="socketStatusText">CONNECTING</span>
+      </div>
+      <div class="status-item">
+        <div class="status-dot" id="apiStatus"></div>
+        <span id="apiStatusText">API</span>
+      </div>
+      <div class="status-item" style="font-size:12px; color: var(--text-dim);">
+        <span id="clockDisplay"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- ═══ HERO CARD ═══ -->
+    <div class="hero-card">
+
+      <!-- Top row: sub count LEFT · goal/remaining RIGHT -->
+      <div class="hero-top">
+
+        <div class="hero-left">
+          <div class="hero-label">CURRENT SUBSCRIBERS</div>
+          <div class="hero-count-row">
+            <div class="sub-count-number" id="subCountDisplay">0</div>
+            <div class="sub-count-delta" id="subDelta">+0</div>
+          </div>
+        </div>
+
+        <div class="hero-vdivider"></div>
+
+        <div class="hero-right">
+          <div class="hero-stat">
+            <div class="hero-stat-label">GOAL</div>
+            <div class="hero-stat-num amber" id="goalDisplay">200</div>
+          </div>
+          <div class="hero-hdivider"></div>
+          <div class="hero-stat">
+            <div class="hero-stat-label">REMAINING</div>
+            <div class="hero-stat-num red" id="remainingDisplay">117</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Divider -->
+      <div class="hero-section-divider"></div>
+
+      <!-- Middle: BIG timer -->
+      <div class="hero-timer-section">
+        <div class="hero-timer-label">
+          <span class="hero-timer-dot"></span> STREAM TIMER
+        </div>
+
+        <div class="hero-timer-inputs">
+          <div class="hero-timer-unit">
+            <input class="hero-timer-input" id="timerHH" type="number" min="0" max="23" value="0" />
+            <span class="hero-timer-unit-lbl">HRS</span>
+          </div>
+          <span class="hero-timer-sep">:</span>
+          <div class="hero-timer-unit">
+            <input class="hero-timer-input" id="timerMM" type="number" min="0" max="59" value="30" />
+            <span class="hero-timer-unit-lbl">MIN</span>
+          </div>
+          <span class="hero-timer-sep">:</span>
+          <div class="hero-timer-unit">
+            <input class="hero-timer-input" id="timerSS" type="number" min="0" max="59" value="0" />
+            <span class="hero-timer-unit-lbl">SEC</span>
+          </div>
+        </div>
+
+        <div class="hero-countdown" id="timerCountdown">00:30:00</div>
+
+        <div class="hero-timer-btns">
+          <button class="hero-btn hero-btn-start" id="timerStartBtn" onclick="timerStart()">&#9654; START</button>
+          <button class="hero-btn hero-btn-pause" id="timerPauseBtn" onclick="timerPause()" disabled>&#9646;&#9646; PAUSE</button>
+          <button class="hero-btn hero-btn-reset" onclick="timerReset()">&#8635; RESET</button>
+        </div>
+      </div>
+
+      <!-- Bottom: shoutout banner -->
+      <div class="hero-shoutout">
+        <div class="hero-shoutout-fire">🔥</div>
+        <div class="hero-shoutout-msg">
+          👆 SUBSCRIBE NOW get <span class="hero-shoutout-cta">SHOUTOUT!</span>
+        </div>
+        <div class="hero-shoutout-fire">🔥</div>
+      </div>
+
+    </div>
+
+    <!-- Shorts Views Card -->
+    <div class="views-card">
+      <div class="views-card-top">
+        <div class="views-left">
+          <div class="views-label">🎬 LATEST SHORT — VIEWS</div>
+          <div class="views-count-row">
+            <div class="views-number" id="viewsDisplay">0</div>
+            <div class="views-delta" id="viewsDelta">+0</div>
+          </div>
+        </div>
+        <div class="views-vdivider"></div>
+        <div class="views-right">
+          <div class="views-stat">
+            <div class="views-stat-label">TARGET</div>
+            <div class="views-stat-num cyan" id="viewsGoalDisplay">1,000</div>
+          </div>
+          <div class="views-hdivider"></div>
+          <div class="views-stat">
+            <div class="views-stat-label">REMAINING</div>
+            <div class="views-stat-num green" id="viewsRemainingDisplay">1,000</div>
+          </div>
+        </div>
+      </div>
+      <div class="views-progress-wrap">
+        <div class="views-progress-bar">
+          <div class="views-progress-fill" id="viewsProgressFill" style="width:0%"></div>
+        </div>
+        <div class="views-progress-pct" id="viewsProgressPct">0%</div>
+      </div>
+    </div>
+
+    <!-- Progress Section -->
+    <div class="progress-section">
+      <div class="progress-header">
+        <div class="progress-title">GOAL PROGRESS</div>
+        <div class="progress-pct" id="progressPct">0%</div>
+      </div>
+
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+        <div class="milestone-markers" id="milestoneMarkers"></div>
+      </div>
+
+      <div class="progress-labels">
+        <span>0</span>
+        <span id="goalLabelBottom">10,000</span>
+      </div>
+
+      <div class="milestones-row" id="milestonesRow">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value" id="statPercent">0%</div>
+        <div class="stat-label">COMPLETION</div>
+      </div>
+      <div class="stat-card highlight">
+        <div class="stat-value" id="statRemaining">0</div>
+        <div class="stat-label">SUBS TO GO</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statDetected">0</div>
+        <div class="stat-label">DONE EVENTS</div>
+      </div>
+    </div>
+
+    <!-- Test Controls -->
+    <div class="test-panel">
+      <div class="test-panel-title">⚡ TEST CONTROLS</div>
+      <div class="test-controls">
+        <input class="test-input" type="text" id="testUsername"
+               placeholder="Enter username..." value="TestViewer" />
+        <button class="btn btn-red" onclick="triggerTestSubscriber()">
+          TRIGGER DONE
+        </button>
+        <button class="btn btn-amber" onclick="bumpSubs()">
+          +1 SUB
+        </button>
+        <a href="/overlay" target="_blank" class="btn btn-ghost" style="text-decoration:none; font-size:12px;">
+          OBS OVERLAY ↗
+        </a>
+      </div>
+    </div>
+
+    <!-- Sound Controls -->
+    <div class="sound-panel">
+      <div class="sound-panel-title">🔊 SOUND ENGINE</div>
+      <div class="sound-controls">
+
+        <button class="btn btn-sound" id="soundToggle" onclick="toggleSound()">
+          🔔 SOUND ON
+        </button>
+
+        <button class="btn btn-sound-test" onclick="testSound()">
+          ▶ TEST DING
+        </button>
+
+        <div class="volume-group">
+          <span class="volume-label">VOL</span>
+          <input type="range" id="volumeSlider" class="volume-slider"
+                 min="0" max="1" step="0.05" value="0.7" />
+          <span class="volume-value" id="volumeValue">70%</span>
+        </div>
+
+        <div class="sound-legend">
+          <div class="sound-event"><span class="sound-dot ding"></span>New Sub → Bell Ding</div>
+          <div class="sound-event"><span class="sound-dot chat"></span>DONE Chat → Soft Ping</div>
+          <div class="sound-event"><span class="sound-dot blip"></span>Counter Up → Blip</div>
+          <div class="sound-event"><span class="sound-dot fanfare"></span>Milestone → Fanfare</div>
+        </div>
+
+      </div>
+    </div>
+
+  </main><!-- Sidebar / Chat Feed -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">LIVE CHAT</div>
+      <div class="chat-header-right">
+        <div class="chat-count" id="chatCount">0 MSG</div>
+        <button class="chat-clear-btn" onclick="clearChat()" title="Clear chat">🗑 CLEAR</button>
+      </div>
+    </div>
+    <div class="chat-feed" id="chatFeed">
+      <div class="chat-msg" style="border-left-color: var(--text-muted);">
+        <div class="chat-author">SYSTEM</div>
+        <div class="chat-text">Waiting for live chat messages...</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Bottom Ticker -->
+  <div class="ticker">
+    <div class="ticker-label">LIVE</div>
+    <div class="ticker-track" id="tickerTrack">
+      <div class="ticker-item">🎥 YOUTUBE SUBSCRIBER DASHBOARD</div>
+      <div class="ticker-item">💬 TYPE "DONE" IN CHAT TO TRIGGER ALERT</div>
+      <div class="ticker-item">📊 REAL-TIME SUBSCRIBER TRACKING</div>
+      <div class="ticker-item">🔥 SUBSCRIBE TO SUPPORT THE CHANNEL</div>
+      <div class="ticker-item">⚡ POWERED BY YOUTUBE DATA API V3</div>
+      <div class="ticker-item">🎥 YOUTUBE SUBSCRIBER DASHBOARD</div>
+      <div class="ticker-item">💬 TYPE "DONE" IN CHAT TO TRIGGER ALERT</div>
+      <div class="ticker-item">📊 REAL-TIME SUBSCRIBER TRACKING</div>
+      <div class="ticker-item">🔥 SUBSCRIBE TO SUPPORT THE CHANNEL</div>
+      <div class="ticker-item">⚡ POWERED BY YOUTUBE DATA API V3</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ─── Notification Popup ──────────────────────────────────────────────── -->
+<div class="notification-overlay" id="notificationOverlay">
+  <div class="notification-popup" id="notificationPopup">
+    <div class="popup-scanline"></div>
+    <span class="popup-fire">🔥</span>
+    <div class="popup-thank">THANK YOU</div>
+    <div class="popup-username" id="popupUsername">USERNAME</div>
+    <div class="popup-sub-text">FOR SUBSCRIBING 🔥</div>
+  </div>
+</div>
+
+<!-- Alert Banner -->
+<div class="alert-banner" id="alertBanner"></div>
+
+<!-- ─── Subscriber Log (bottom-right corner) ────────────────────────────── -->
+<div class="sub-log-corner" id="subLogCorner">
+
+  <!-- Collapsed tab (always visible) -->
+  <button class="sub-log-tab" id="subLogTab" onclick="toggleSubLog()">
+    <span class="sub-log-tab-icon">📋</span>
+    <span class="sub-log-tab-label">SUBSCRIBER LOG</span>
+    <span class="sub-log-badge" id="subLogBadge">0</span>
+  </button>
+
+  <!-- Expanded panel -->
+  <div class="sub-log-panel" id="subLogPanel">
+    <div class="sub-log-header">
+      <div class="sub-log-title">
+        🔥 SUBSCRIBER LOG
+        <span class="sub-log-total" id="subLogTotal">0 total</span>
+      </div>
+      <div class="sub-log-actions">
+        <button class="sub-log-btn" onclick="exportSubLog()">&#11015; EXPORT</button>
+        <button class="sub-log-btn sub-log-btn-danger" onclick="clearSubLog()">&#128465; CLEAR</button>
+        <button class="sub-log-btn" onclick="toggleSubLog()">&#10005;</button>
+      </div>
+    </div>
+
+    <div class="sub-log-search-wrap">
+      <input class="sub-log-search" id="subLogSearch"
+             type="text" placeholder="Search names..."
+             oninput="filterSubLog()" />
+    </div>
+
+    <div class="sub-log-list" id="subLogList">
+      <div class="sub-log-empty" id="subLogEmpty">No subscribers yet — they will appear here when someone types DONE</div>
+    </div>
+
+    <div class="sub-log-footer">
+      <span class="sub-log-footer-note">Stored in browser &middot; survives page refresh</span>
+    </div>
+  </div>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/client.js"></script>
+</body>
+</html>

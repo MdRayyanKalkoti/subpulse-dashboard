@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: subpulse-dashboard
+    env: docker # ← uses Dockerfile instead of Node buildpack
+    dockerfilePath: ./Dockerfile # ← path to your Dockerfile
+    plan: free
+    envVars:
+      # ── YouTube API ────────────────────────────────────────────────────────
+      - key: YOUTUBE_API_KEY
+        sync: false # you set this manually in Render dashboard
+
+      - key: YOUTUBE_CHANNEL_ID
+        sync: false
+
+      - key: YOUTUBE_LIVE_VIDEO_ID
+        sync: false
+
+      # ── Shorts Views ───────────────────────────────────────────────────────
+      - key: YOUTUBE_SHORTS_VIDEO_ID
+        sync: false
+
+      - key: VIEWS_GOAL
+        value: 1000
+
+      # ── Subscriber Goal ────────────────────────────────────────────────────
+      - key: SUBSCRIBER_GOAL
+        value: 200
+
+      - key: SUBSCRIBER_START
+        value: 84
+
+      # ── Intervals ──────────────────────────────────────────────────────────
+      - key: POLL_INTERVAL_MS
+        value: 30000
+
+      - key: CHAT_POLL_INTERVAL_MS
+        value: 5000
+
+      # ── Server ─────────────────────────────────────────────────────────────
+      - key: PORT
+        value: 3000
+
+      - key: NODE_ENV
+        value: production

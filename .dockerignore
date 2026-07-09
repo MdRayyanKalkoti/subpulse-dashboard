@@ -1,0 +1,14 @@
+# ── .dockerignore ─────────────────────────────────────────────────────────────
+# These files are NOT copied into the Docker image
+
+node_modules
+npm-debug.log
+.env
+.env.*
+.git
+.gitignore
+README.md
+*.md
+.vscode
+SubPulse_Setup_Guide.pdf
+render.yaml
