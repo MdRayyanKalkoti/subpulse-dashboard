@@ -21,6 +21,9 @@
     // Shorts views
     views: 0,
     viewsGoal: 1000,
+    // DONE queue
+    doneQueue: [],
+    doneQueueProcessing: false,
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -232,6 +235,18 @@
     viewsRemainingDisplay: $("viewsRemainingDisplay"),
     viewsProgressFill: $("viewsProgressFill"),
     viewsProgressPct:  $("viewsProgressPct"),
+    // Feature 1: viewer count
+    viewerCount:       $("viewerCount"),
+    viewerCountBadge:  $("viewerCountBadge"),
+    // Feature 3: milestone countdown
+    mcbSubsNeeded:     $("mcbSubsNeeded"),
+    mcbNextPct:        $("mcbNextPct"),
+    mcbMiniFill:       $("mcbMiniFill"),
+    mcbMiniPct:        $("mcbMiniPct"),
+    milestoneCountdownBar: $("milestoneCountdownBar"),
+    // DONE queue
+    doneQueueBar:      $("doneQueueBar"),
+    doneQueueCount:    $("doneQueueCount"),
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -409,6 +424,9 @@
       var chip = $("milestone-chip-" + mpct);
       if (chip && count >= m) chip.classList.add("reached");
     });
+
+    // Update next milestone countdown
+    updateMilestoneCountdown(count, goal, state.milestones);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -603,11 +621,13 @@
     console.log("🔔 Subscriber detected:", data.username);
     state.doneDetected++;
     els.statDetected.textContent = state.doneDetected;
-
-    showNotification(data.username);  // fires playSubscribeDing() internally
     addChatMessage(data.username, "DONE", true);
-    showAlertBanner("🔥 " + data.username + " subscribed!");
-    logSubscriber(data.username);     // 📋 save to subscriber log
+    logSubscriber(data.username);
+
+    // Add to DONE queue
+    state.doneQueue.push(data.username);
+    updateQueueUI();
+    processQueue();
   });
 
   socket.on("chatMessage", function(data) {
@@ -618,6 +638,14 @@
 
   socket.on("viewsUpdate", function(data) {
     updateViewsUI(data.views, data.viewsGoal, data.gained);
+  });
+
+  // Feature 1: Live viewer count
+  socket.on("viewerUpdate", function(data) {
+    if (els.viewerCount) els.viewerCount.textContent = data.viewers.toLocaleString();
+    if (els.viewerCountBadge) {
+      els.viewerCountBadge.style.color = data.viewers > 0 ? "var(--green)" : "var(--text-dim)";
+    }
   });
 
   socket.on("milestoneReached", function(data) {
@@ -783,6 +811,78 @@
   // Init display
   timerRemaining = timerReadInputs();
   timerUpdateDisplay();
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  ⏳  DONE QUEUE — shows popups one by one, never misses a subscriber
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function updateQueueUI() {
+    var count = state.doneQueue.length;
+    if (els.doneQueueBar) {
+      els.doneQueueBar.style.display = count > 0 ? "flex" : "none";
+    }
+    if (els.doneQueueCount) els.doneQueueCount.textContent = count;
+  }
+
+  function processQueue() {
+    if (state.doneQueueProcessing || state.doneQueue.length === 0) return;
+    state.doneQueueProcessing = true;
+    var username = state.doneQueue.shift();
+    updateQueueUI();
+
+    showNotification(username);         // show popup + sound
+    showAlertBanner("🔥 " + username + " subscribed!");
+
+    // Wait for popup to finish before showing next (6 seconds)
+    setTimeout(function() {
+      state.doneQueueProcessing = false;
+      processQueue();                   // process next in queue
+    }, 6000);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  ⚡  NEXT MILESTONE COUNTDOWN
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function updateMilestoneCountdown(currentSubs, goal, milestones) {
+    if (!els.milestoneCountdownBar) return;
+
+    // Find next milestone not yet reached
+    var nextMilestone = null;
+    for (var i = 0; i < milestones.length; i++) {
+      if (currentSubs < milestones[i]) {
+        nextMilestone = milestones[i];
+        break;
+      }
+    }
+
+    if (!nextMilestone) {
+      // All milestones reached — show goal
+      nextMilestone = goal;
+    }
+
+    var nextPct   = Math.round((nextMilestone / goal) * 100);
+    var needed    = Math.max(0, nextMilestone - currentSubs);
+    var prevMilestone = 0;
+    for (var j = 0; j < milestones.length; j++) {
+      if (milestones[j] < nextMilestone) prevMilestone = milestones[j];
+    }
+    var segProgress = Math.min(100, Math.round(
+      ((currentSubs - prevMilestone) / (nextMilestone - prevMilestone)) * 100
+    ));
+
+    if (els.mcbSubsNeeded) els.mcbSubsNeeded.textContent = needed.toLocaleString();
+    if (els.mcbNextPct)    els.mcbNextPct.textContent    = nextPct + "%";
+    if (els.mcbMiniFill)   els.mcbMiniFill.style.width   = segProgress + "%";
+    if (els.mcbMiniPct)    els.mcbMiniPct.textContent    = segProgress + "%";
+
+    // Pulse when close
+    if (needed <= 5 && needed > 0) {
+      els.milestoneCountdownBar.classList.add("mcb-pulse");
+    } else {
+      els.milestoneCountdownBar.classList.remove("mcb-pulse");
+    }
+  }
 
   // ─── Seed chat with demo messages ──────────────────────────────────────────
   setTimeout(function() { addChatMessage("System",      "Dashboard is live! Type DONE to trigger alert."); }, 800);

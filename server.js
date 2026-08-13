@@ -42,6 +42,7 @@ let state = {
   reachedMilestones: new Set(),
   isApiConfigured: !!(API_KEY && CHANNEL_ID),
   isLiveChatConfigured: !!(API_KEY && LIVE_VIDEO_ID),
+  concurrentViewers: 0,
   // Shorts views
   shortsViews: 0,
   viewsGoal: VIEWS_GOAL,
@@ -93,6 +94,27 @@ async function fetchSubscriberCount() {
   } catch (err) {
     console.error("❌  Failed to fetch subscriber count:", err.message);
     return state.subscribers;
+  }
+}
+
+// ─── Live Viewer Count ────────────────────────────────────────────────────────
+async function pollViewerCount() {
+  if (!API_KEY || !LIVE_VIDEO_ID) return;
+  try {
+    const res = await axios.get("https://www.googleapis.com/youtube/v3/videos", {
+      params: { key: API_KEY, id: LIVE_VIDEO_ID, part: "liveStreamingDetails" },
+    });
+    const items = res.data.items;
+    if (items && items.length > 0) {
+      const viewers = parseInt(
+        items[0].liveStreamingDetails?.concurrentViewers || "0", 10
+      );
+      state.concurrentViewers = viewers;
+      io.emit("viewerUpdate", { viewers });
+      if (viewers > 0) console.log("👀  Live viewers: " + viewers);
+    }
+  } catch (err) {
+    console.error("❌  Failed to fetch viewer count:", err.message);
   }
 }
 
@@ -268,6 +290,7 @@ app.get("/api/state", (req, res) => {
     shortsViews: state.shortsViews,
     viewsGoal: state.viewsGoal,
     isShortsConfigured: state.isShortsConfigured,
+    concurrentViewers: state.concurrentViewers,
   });
 });
 
@@ -317,6 +340,10 @@ async function startPolling() {
   // Initial subscriber fetch
   await pollSubscribers();
   setInterval(pollSubscribers, POLL_INTERVAL);
+
+  // Live viewer count polling (every 60s to save quota)
+  pollViewerCount();
+  setInterval(pollViewerCount, 60000);
 
   // Shorts views polling
   if (state.isShortsConfigured) {
